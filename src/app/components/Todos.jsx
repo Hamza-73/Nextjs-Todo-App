@@ -20,8 +20,7 @@ import {
   Close,
   Add as AddIcon,
 } from "@mui/icons-material";
-import {
-  updateTaskStatus,
+import updateTaskStatus, {
   deleteTodo,
   updateTaskText,
   deleteTaskItem,
@@ -64,6 +63,19 @@ export default function Todos({ todos }) {
     await addTaskItem(todoId, text);
     setNewItemText((prev) => ({ ...prev, [todoId]: "" }));
     setAddingItemId(null);
+  };
+
+  const getStatusColor = (status) => {
+    switch (status) {
+      case "Pending":
+        return "red";
+      case "In Progress":
+        return "orange";
+      case "Completed":
+        return "green";
+      default:
+        return "black";
+    }
   };
 
   return (
@@ -211,20 +223,37 @@ export default function Todos({ todos }) {
                         </Box>
 
                         <Select
-                          value={item.status}
+                          value={item.status || "Pending"} // Added default fallback
                           onChange={(e) =>
                             handleStatusChange(todo._id, index, e.target.value)
                           }
                           size="small"
+                          variant="outlined" // Use outlined variant for better border styling
                           sx={{
                             minWidth: 120,
                             fontSize: 14,
                             borderRadius: 1,
+                            "& .MuiOutlinedInput-notchedOutline": {
+                              borderColor: getStatusColor(item.status, true), // Darker border color
+                            },
+                            color: getStatusColor(item.status), // Apply text color based on status
                           }}
                         >
-                          <MenuItem value="Pending">Pending</MenuItem>
-                          <MenuItem value="In Progress">In Progress</MenuItem>
-                          <MenuItem value="Completed">Completed</MenuItem>
+                          <MenuItem value="Pending" style={{ color: "red" }}>
+                            Pending
+                          </MenuItem>
+                          <MenuItem
+                            value="In Progress"
+                            style={{ color: "orange" }}
+                          >
+                            In Progress
+                          </MenuItem>
+                          <MenuItem
+                            value="Completed"
+                            style={{ color: "green" }}
+                          >
+                            Completed
+                          </MenuItem>
                         </Select>
 
                         <IconButton

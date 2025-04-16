@@ -93,7 +93,8 @@ export async function deleteTodo(todoId) {
 }
 
 // Update a task status in a todo
-export default async function updateTaskStatus(todoId, itemIndex) {
+export default async function updateTaskStatus(todoId, itemIndex, newStatus) {
+  console.log("start")
   const user = await currentUser();
   if (!user) {
     console.error("Authentication required");
@@ -110,17 +111,11 @@ export default async function updateTaskStatus(todoId, itemIndex) {
     return { success: false };
   }
 
-  const statusCycle = {
-    Pending: "In Progress",
-    "In Progress": "Completed",
-    Completed: "Pending",
-  };
-
   const updatedTaskItems = todo.taskItems.map((item, index) => {
     if (index === itemIndex) {
       return {
         ...item,
-        status: statusCycle[item.status] || "Pending",
+        status: newStatus || "Pending",
       };
     }
     return item;
