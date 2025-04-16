@@ -43,7 +43,7 @@ export async function addTodo(formData) {
   const title = formData.get("title");
   const taskItems = formData.getAll("taskItems").map((text) => ({
     text,
-    completed: false,
+    status: "Pending", // default to Pending
   }));
 
   if (!title || title.trim() === "") throw new Error("Title is required");
@@ -101,11 +101,6 @@ export default async function updateTaskStatus(todoId, itemIndex) {
   }
 
   const todoCollection = await getCollection("todos");
-  if (!todoCollection) {
-    console.error("Todo collection not found");
-    return { success: false };
-  }
-
   const todo = await todoCollection.findOne({
     _id: ObjectId.createFromHexString(todoId),
   });
@@ -115,9 +110,18 @@ export default async function updateTaskStatus(todoId, itemIndex) {
     return { success: false };
   }
 
+  const statusCycle = {
+    Pending: "In Progress",
+    "In Progress": "Completed",
+    Completed: "Pending",
+  };
+
   const updatedTaskItems = todo.taskItems.map((item, index) => {
     if (index === itemIndex) {
-      return { ...item, completed: !item.completed };
+      return {
+        ...item,
+        status: statusCycle[item.status] || "Pending",
+      };
     }
     return item;
   });
@@ -129,16 +133,81 @@ export default async function updateTaskStatus(todoId, itemIndex) {
     );
 
     revalidatePath("/");
-
-    return {
-      success: true,
-      updatedTaskItems,
-    };
+    return { success: true, updatedTaskItems };
   } catch (error) {
     console.error("Error updating todo:", error);
-    return {
-      success: false,
-      error: "Failed to update todo",
-    };
+    return { success: false, error: "Failed to update todo" };
   }
+}
+
+export async function updateTaskText(todoId, itemIndex, newText) {
+  const user = await currentUser();
+  if (!user) {
+    console.error("Authentication required");
+    return { success: false };
+  }
+
+  const todoCollection = await getCollection("todos");
+  const todo = await todoCollection.findOne({
+    _id: ObjectId.createFromHexString(todoId),
+  });
+
+  if (!todo || todo.userId !== user.id) {
+    console.error("Unauthorized or todo not found");
+    return { success: false };
+  }
+
+  todo.taskItems[itemIndex].text = newText;
+
+  try {
+    await todoCollection.updateOne(
+      { _id: todo._id },
+      { $set: { taskItems: todo.taskItems } }
+    );
+    revalidatePath("/");
+    return { success: true };
+  } catch (err) {
+    console.error("Error updating task text:", err);
+    return { success: false };
+  }
+}
+
+export async function deleteTaskItem(todoId, itemIndex) {
+  const user = await currentUser();
+  const collection = await getCollection("todos");
+
+  const todo = await collection.findOne({
+    _id: ObjectId.createFromHexString(todoId),
+  });
+
+  if (todo?.userId !== user.id) return;
+
+  todo.taskItems.splice(itemIndex, 1);
+
+  await collection.updateOne(
+    { _id: todo._id },
+    { $set: { taskItems: todo.taskItems } }
+  );
+
+  revalidatePath("/");
+}
+
+export async function addTaskItem(todoId, text) {
+  const user = await currentUser();
+  const collection = await getCollection("todos");
+
+  const todo = await collection.findOne({
+    _id: ObjectId.createFromHexString(todoId),
+  });
+
+  if (todo?.userId !== user.id) return;
+
+  todo.taskItems.push({ text, status: "Pending" });
+
+  await collection.updateOne(
+    { _id: todo._id },
+    { $set: { taskItems: todo.taskItems } }
+  );
+
+  revalidatePath("/");
 }

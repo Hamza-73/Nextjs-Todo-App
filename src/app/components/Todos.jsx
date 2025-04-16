@@ -1,25 +1,69 @@
 "use client";
 
-import React, { useEffect, useState } from "react";
-import updateTaskStatus, { deleteTodo, getTodo } from "../actions/todo"; // assumed update API
+import React, { useState } from "react";
 import {
   Box,
-  Chip,
-  List,
-  ListItem,
-  ListItemText,
   Typography,
   IconButton,
+  List,
+  ListItem,
   Select,
   MenuItem,
+  TextField,
+  Stack,
+  Button,
 } from "@mui/material";
-import CheckCircleIcon from "@mui/icons-material/CheckCircle";
-import RadioButtonUncheckedIcon from "@mui/icons-material/RadioButtonUnchecked";
-import { ArrowDropDown, Delete } from "@mui/icons-material";
+import {
+  Delete,
+  Edit,
+  Check,
+  Close,
+  Add as AddIcon,
+} from "@mui/icons-material";
+import {
+  updateTaskStatus,
+  deleteTodo,
+  updateTaskText,
+  deleteTaskItem,
+  addTaskItem,
+} from "../actions/todo";
 
 export default function Todos({ todos }) {
-  const handleToggleStatus = async (todoId, itemIndex) => {
-    await updateTaskStatus(todoId, itemIndex);
+  const [editing, setEditing] = useState({ todoId: null, itemIndex: null });
+  const [editedText, setEditedText] = useState("");
+  const [newItemText, setNewItemText] = useState({});
+  const [addingItemId, setAddingItemId] = useState(null);
+
+  const isEditing = (todoId, index) =>
+    editing.todoId === todoId && editing.itemIndex === index;
+
+  const handleEditClick = (todoId, index, currentText) => {
+    setEditing({ todoId, itemIndex: index });
+    setEditedText(currentText);
+  };
+
+  const handleCancelEdit = () => {
+    setEditing({ todoId: null, itemIndex: null });
+    setEditedText("");
+  };
+
+  const handleConfirmEdit = async () => {
+    if (editedText.trim() === "") return;
+    await updateTaskText(editing.todoId, editing.itemIndex, editedText.trim());
+    handleCancelEdit();
+  };
+
+  const handleStatusChange = async (todoId, itemIndex, newStatus) => {
+    await updateTaskStatus(todoId, itemIndex, newStatus);
+  };
+
+  const handleAddTaskItem = async (todoId) => {
+    const text = newItemText[todoId]?.trim();
+    if (!text) return;
+
+    await addTaskItem(todoId, text);
+    setNewItemText((prev) => ({ ...prev, [todoId]: "" }));
+    setAddingItemId(null);
   };
 
   return (
@@ -44,13 +88,16 @@ export default function Todos({ todos }) {
                 key={todo._id}
                 sx={{
                   padding: 2,
-                  borderRadius: 1,
-                  boxShadow: 2,
-                  mb: 3,
-                  // backgroundColor: "#f9f9f9",
+                  borderRadius: 2,
+                  boxShadow: 3,
+                  backgroundColor: "#f9f9f9",
                   transition: "transform 0.3s ease",
+                  display: "flex",
+                  flexDirection: "column",
+                  height: "100%",
                   "&:hover": {
-                    transform: "scale(1.05)",
+                    cursor: "pointer",
+                    boxShadow: 6,
                   },
                 }}
               >
@@ -81,78 +128,153 @@ export default function Todos({ todos }) {
                     onClick={() => deleteTodo(todo._id)}
                     sx={{
                       color: "red",
-                      transition: "0.2s ease",
                       "&:hover": {
                         color: "#b30000",
                       },
                     }}
-                    aria-label="delete"
                   >
                     <Delete />
                   </IconButton>
                 </Box>
 
-                <List sx={{ padding: 0 }}>
-                  {todo.taskItems.map((item, index) => (
-                    <ListItem
-                      key={index}
-                      sx={{
-                        borderBottom: "1px solid #e0e0e0",
-                        paddingLeft: 0,
-                        paddingRight: 0,
-                        display: "flex",
-                        justifyContent: "space-between",
-                        alignItems: "center",
-                        gap: 2,
-                      }}
-                    >
-                      <ListItemText
+                <Box
+                  sx={{ flexGrow: 1, display: "flex", flexDirection: "column" }}
+                >
+                  <List sx={{ padding: 0 }}>
+                    {todo.taskItems.map((item, index) => (
+                      <ListItem
+                        key={index}
                         sx={{
-                          flex: 1,
-                          "& .MuiTypography-root": {
-                            overflow: "auto",
-                            whiteSpace: "normal",
-                            wordWrap: "break-word",
-                            maxHeight: "4.5em",
-                            lineHeight: "1.5em",
-                          },
-                        }}
-                        primary={`${index + 1}) ${item.text}`}
-                      />
-
-                      <Select
-                        value={item.completed ? "completed" : "pending"}
-                        onChange={() => handleToggleStatus(todo._id, index)}
-                        size="small"
-                        variant="outlined"
-                        sx={{
-                          minWidth: 120,
-                          fontSize: 14,
-                          borderRadius: 1,
-                          color: item.completed ? "green" : "red",
-                          "& .MuiOutlinedInput-notchedOutline": {
-                            borderColor: item.completed ? "green" : "red",
-                          },
-                          "&:hover .MuiOutlinedInput-notchedOutline": {
-                            borderColor: item.completed
-                              ? "darkgreen"
-                              : "darkred",
-                          },
-                          "&.Mui-focused .MuiOutlinedInput-notchedOutline": {
-                            borderColor: item.completed ? "green" : "red",
-                          },
+                          borderBottom: "1px solid #e0e0e0",
+                          display: "flex",
+                          justifyContent: "space-between",
+                          alignItems: "center",
+                          gap: 1,
+                          paddingLeft: 0,
+                          paddingRight: 0,
                         }}
                       >
-                        <MenuItem sx={{ color: "red" }} value="pending">
-                          Pending
-                        </MenuItem>
-                        <MenuItem sx={{ color: "green" }} value="completed">
-                          Completed
-                        </MenuItem>
-                      </Select>
-                    </ListItem>
-                  ))}
-                </List>
+                        <Box sx={{ flex: 1 }}>
+                          {isEditing(todo._id, index) ? (
+                            <Stack direction="row" spacing={1}>
+                              <TextField
+                                value={editedText}
+                                onChange={(e) => setEditedText(e.target.value)}
+                                size="small"
+                                fullWidth
+                                autoFocus
+                              />
+                              <IconButton
+                                onClick={handleConfirmEdit}
+                                color="success"
+                              >
+                                <Check />
+                              </IconButton>
+                              <IconButton
+                                onClick={handleCancelEdit}
+                                color="error"
+                              >
+                                <Close />
+                              </IconButton>
+                            </Stack>
+                          ) : (
+                            <Box
+                              sx={{
+                                display: "flex",
+                                alignItems: "center",
+                                "&:hover .edit-icon": { opacity: 1 },
+                              }}
+                            >
+                              <Typography
+                                onClick={() =>
+                                  handleEditClick(todo._id, index, item.text)
+                                }
+                                sx={{
+                                  flex: 1,
+                                  cursor: "pointer",
+                                  transition: "color 0.2s ease",
+                                }}
+                              >
+                                {index + 1}) {item.text}
+                              </Typography>
+                              <IconButton
+                                className="edit-icon"
+                                sx={{ opacity: 0, ml: 1 }}
+                                onClick={() =>
+                                  handleEditClick(todo._id, index, item.text)
+                                }
+                              >
+                                <Edit fontSize="small" />
+                              </IconButton>
+                            </Box>
+                          )}
+                        </Box>
+
+                        <Select
+                          value={item.status}
+                          onChange={(e) =>
+                            handleStatusChange(todo._id, index, e.target.value)
+                          }
+                          size="small"
+                          sx={{
+                            minWidth: 120,
+                            fontSize: 14,
+                            borderRadius: 1,
+                          }}
+                        >
+                          <MenuItem value="Pending">Pending</MenuItem>
+                          <MenuItem value="In Progress">In Progress</MenuItem>
+                          <MenuItem value="Completed">Completed</MenuItem>
+                        </Select>
+
+                        <IconButton
+                          onClick={() => deleteTaskItem(todo._id, index)}
+                          color="error"
+                        >
+                          <Delete fontSize="small" />
+                        </IconButton>
+                      </ListItem>
+                    ))}
+                  </List>
+                </Box>
+
+                {addingItemId === todo._id ? (
+                  <Stack direction="row" spacing={1} mt={2}>
+                    <TextField
+                      placeholder="New Task"
+                      size="small"
+                      value={newItemText[todo._id] || ""}
+                      onChange={(e) =>
+                        setNewItemText((prev) => ({
+                          ...prev,
+                          [todo._id]: e.target.value,
+                        }))
+                      }
+                      fullWidth
+                    />
+                    <IconButton
+                      onClick={() => handleAddTaskItem(todo._id)}
+                      color="success"
+                    >
+                      <Check />
+                    </IconButton>
+                    <IconButton
+                      onClick={() => setAddingItemId(null)}
+                      color="error"
+                    >
+                      <Close />
+                    </IconButton>
+                  </Stack>
+                ) : (
+                  <Button
+                    variant="outlined"
+                    startIcon={<AddIcon />}
+                    onClick={() => setAddingItemId(todo._id)}
+                    sx={{ mt: 2 }}
+                  >
+                    Add Task Item
+                  </Button>
+                )}
               </Box>
             ))}
           </Box>
